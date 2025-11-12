@@ -4,6 +4,7 @@ import tarfile
 import logging
 from fastapi import FastAPI, HTTPException
 from transformers import pipeline, Pipeline
+from pydantic import BaseModel, Field
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -23,7 +24,14 @@ app = FastAPI(title="AI Model API", version="1.0")
 model_pipeline: Pipeline | None = None
 
 
-def download_model() -> str:
+class GenerateRequest(BaseModel):
+    title: str = Field(..., description="Title of the story")
+    author: str = Field(..., description="Author name")
+    num_words: int = Field(..., gt=0, description="Number of words to generate")
+    story: str = Field(..., description="Initial story or context")
+
+
+def download_model() -> str | None:
     """Download the model from MinIO and extract it if needed."""
     try:
         logger.info(f"Connecting to MinIO at {MINIO_ENDPOINT}")
@@ -87,13 +95,13 @@ def health_check():
 
 
 @app.post("/generate")
-def generate_text(title: str, author: str, words: int, story: str):
+def generate_text(request: GenerateRequest):
     if model_pipeline is None:
         raise HTTPException(status_code=503, detail="No model available yet. Please train and upload one first.")
 
     try:
-        prompt = f"Title: {title}\nAuthor: {author}\nStory: {story}\n\nContinue ({words} words):"
-        result = model_pipeline(prompt, max_length=words + len(prompt.split()))
+        prompt = f"Title: {request.title}\nAuthor: {request.author}\nStory: {request.story}\n\nContinue ({request.num_words} words):"
+        result = model_pipeline(prompt, max_length=request.num_words + len(prompt.story.split()))
         return {"generated_text": result[0]["generated_text"]}
     except Exception as e:
         logger.error(f"Error during text generation: {e}")
