@@ -80,7 +80,7 @@ def load_model(model_file: str) -> Pipeline:
         model_path = download_and_extract_model(model_file)
         logger.info(f"Loading model from {model_path}...")
         model = pipeline("text-generation", model=model_path)
-        logger.info(f"✅ Model '{model_file}' loaded successfully.")
+        logger.info(f"Model '{model_file}' loaded successfully.")
         return model
     except Exception as e:
         logger.error(f"Failed to load model '{model_file}': {e}")
