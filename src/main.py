@@ -50,7 +50,6 @@ def list_models_in_minio() -> List[str]:
         logger.error(f"Failed to list models from MinIO: {e}")
         return []
 
-
 def download_and_extract_model(model_file: str) -> str:
     """Download and extract the specified model."""
     try:
@@ -61,14 +60,22 @@ def download_and_extract_model(model_file: str) -> str:
         logger.info(f"Downloading model '{model_file}' from MinIO...")
         s3.download_file(MINIO_BUCKET, model_file, local_path)
 
-        extract_path = os.path.join(MODEL_DIR, os.path.splitext(os.path.basename(model_file))[0])
+        # Correct extraction path (remove both .tar and .gz extensions)
+        base_name = os.path.basename(model_file).replace(".tar.gz", "")
+        extract_path = os.path.join(MODEL_DIR, base_name)
         os.makedirs(extract_path, exist_ok=True)
 
+        logger.info(f"Extracting model to {extract_path}...")
         with tarfile.open(local_path, "r:gz") as tar:
             tar.extractall(extract_path)
 
-        logger.info(f"Model '{model_file}' extracted to {extract_path}")
+        # Verify model files exist
+        if not os.path.exists(extract_path):
+            raise FileNotFoundError(f"Extracted model directory not found: {extract_path}")
+
+        logger.info(f"Model '{model_file}' extracted successfully to {extract_path}")
         return extract_path
+
     except Exception as e:
         logger.error(f"Error extracting model '{model_file}': {e}")
         raise HTTPException(status_code=500, detail=f"Failed to extract model: {e}")
