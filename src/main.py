@@ -4,9 +4,8 @@ import tarfile
 import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from transformers import pipeline, Pipeline
+from transformers import pipeline, Pipeline, AutoModelForCausalLM, AutoTokenizer
 from typing import Optional, List
-
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -85,21 +84,17 @@ def load_model(model_file: str) -> Pipeline:
         model_path = download_and_extract_model(model_file)
         logger.info(f"Loading model from {model_path}...")
 
-        config_path = os.path.join(model_path, "config.json")
-        if not os.path.exists(config_path):
-            for root, dirs, files in os.walk(model_path):
-                if "config.json" in files:
-                    model_path = root
-                    logger.info(f"Detected model directory: {model_path}")
-                    break
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        model = AutoModelForCausalLM.from_pretrained(model_path)
 
-        model = pipeline("text-generation", model=model_path)
+        pipeline_model = pipeline("text-generation", model=model, tokenizer=tokenizer)
         logger.info(f"Model '{model_file}' loaded successfully.")
-        return model
+        return pipeline_model
 
     except Exception as e:
         logger.error(f"Failed to load model '{model_file}': {e}")
-        raise HTTPException(status_code=500, detail=f"Model loading failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Model {model_file} loading failed: {e}")
+
 
 
 # -----------------------------
