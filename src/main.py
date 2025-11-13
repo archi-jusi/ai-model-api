@@ -60,20 +60,18 @@ def download_and_extract_model(model_file: str) -> str:
         logger.info(f"Downloading model '{model_file}' from MinIO...")
         s3.download_file(MINIO_BUCKET, model_file, local_path)
 
-        # Correct extraction path (remove both .tar and .gz extensions)
         base_name = os.path.basename(model_file).replace(".tar.gz", "")
         extract_path = os.path.join(MODEL_DIR, base_name)
         os.makedirs(extract_path, exist_ok=True)
 
-        logger.info(f"Extracting model to {extract_path}...")
         with tarfile.open(local_path, "r:gz") as tar:
             tar.extractall(extract_path)
 
-        # Verify model files exist
-        if not os.path.exists(extract_path):
-            raise FileNotFoundError(f"Extracted model directory not found: {extract_path}")
+        logger.info(f"Model '{model_file}' extracted to {extract_path}")
 
-        logger.info(f"Model '{model_file}' extracted successfully to {extract_path}")
+        if not os.path.exists(os.path.join(extract_path, "config.json")):
+            raise HTTPException(status_code=400, detail=f"Invalid model archive: missing config.json")
+
         return extract_path
 
     except Exception as e:
@@ -86,9 +84,19 @@ def load_model(model_file: str) -> Pipeline:
     try:
         model_path = download_and_extract_model(model_file)
         logger.info(f"Loading model from {model_path}...")
+
+        config_path = os.path.join(model_path, "config.json")
+        if not os.path.exists(config_path):
+            for root, dirs, files in os.walk(model_path):
+                if "config.json" in files:
+                    model_path = root
+                    logger.info(f"Detected model directory: {model_path}")
+                    break
+
         model = pipeline("text-generation", model=model_path)
         logger.info(f"Model '{model_file}' loaded successfully.")
         return model
+
     except Exception as e:
         logger.error(f"Failed to load model '{model_file}': {e}")
         raise HTTPException(status_code=500, detail=f"Model loading failed: {e}")
