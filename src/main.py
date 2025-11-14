@@ -81,17 +81,42 @@ def download_and_extract_model(model_file: str) -> str:
 def load_model(model_file: str) -> Pipeline:
     """Load a specific model from MinIO."""
     try:
+        logger.info(f"[DEBUG] Request to load model: {model_file}")
+
         model_path = download_and_extract_model(model_file)
-        logger.info(f"Loading model from {model_path}...")
+        logger.info(f"[DEBUG] Model extracted path: {model_path}")
+        logger.info(f"[DEBUG] Directory contents: {os.listdir(model_path)}")
 
+        if model_path is None:
+            logger.error("[DEBUG] ERROR: model_path is None!")
+            raise ValueError("model_path is None")
+
+        config_path = os.path.join(model_path, "config.json")
+        tokenizer_path = os.path.join(model_path, "tokenizer_config.json")
+        model_weights_path = os.path.join(model_path, "model.safetensors")
+
+        logger.info(f"[DEBUG] Checking extracted files:")
+        logger.info(f"  - config.json exists: {os.path.exists(config_path)}")
+        logger.info(f"  - tokenizer_config.json exists: {os.path.exists(tokenizer_path)}")
+        logger.info(f"  - model.safetensors exists: {os.path.exists(model_weights_path)}")
+
+        logger.info(f"[DEBUG] Loading tokenizer from {model_path}...")
         tokenizer = AutoTokenizer.from_pretrained(model_path)
-        model = AutoModelForCausalLM.from_pretrained(model_path)
+        logger.info(f"[DEBUG] Tokenizer loaded → type: {type(tokenizer)}")
 
+        logger.info(f"[DEBUG] Loading model from {model_path}...")
+        model = AutoModelForCausalLM.from_pretrained(model_path)
+        logger.info(f"[DEBUG] Model loaded → type: {type(model)}")
+
+        logger.info("[DEBUG] Building pipeline...")
         pipeline_model = pipeline("text-generation", model=model, tokenizer=tokenizer)
+        logger.info("[DEBUG] Pipeline created successfully")
+
         logger.info(f"Model '{model_file}' loaded successfully.")
         return pipeline_model
 
     except Exception as e:
+        logger.error(f"[DEBUG] Stacktrace:", exc_info=True)
         logger.error(f"Failed to load model '{model_file}': {e}")
         raise HTTPException(status_code=500, detail=f"Model {model_file} loading failed: {e}")
 
