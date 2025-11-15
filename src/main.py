@@ -227,27 +227,33 @@ def load_model_endpoint(request: LoadModelRequest):
 
 @app.post("/generate")
 def generate_text(request: GenerateRequest):
-    logger.debug("POST /generate called.")
-
     if model_pipeline is None:
-        logger.error("No model is loaded. Cannot generate.")
-        raise HTTPException(status_code=503, detail="No model loaded.")
+        raise HTTPException(status_code=503, detail="No model loaded. Please load one first using /load-model.")
 
     try:
         prompt = (
             f"Title: {request.title}\n"
             f"Author: {request.author}\n"
             f"Story: {request.story}\n\n"
-            f"Continue ({request.num_words} words):"
+            f"Continue:"
         )
 
-        result = model_pipeline(prompt, max_length=request.num_words + len(prompt.split()))
+        result = model_pipeline(
+            prompt,
+            max_new_tokens=request.num_words,
+            do_sample=True,
+            top_p=0.92,
+            top_k=50,
+            temperature=0.8,
+            repetition_penalty=1.8, 
+            eos_token_id=model_pipeline.tokenizer.eos_token_id
+        )
 
         return {
             "generated_text": result[0]["generated_text"],
             "model_used": current_model_name,
         }
 
-    except Exception:
-        logger.exception("Text generation failed")
-        raise HTTPException(status_code=500, detail="Generation error")
+    except Exception as e:
+        logger.error(f"Error during generation: {e}")
+        raise HTTPException(status_code=500, detail=f"Text generation failed: {e}")
